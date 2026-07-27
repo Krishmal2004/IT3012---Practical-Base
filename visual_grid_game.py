@@ -35,6 +35,18 @@ class VisualGridHuntGame:
             if tuple(op_pos) != (0, 0) and tuple(op_pos) not in self.walls and tuple(op_pos) not in self.food_positions:
                 self.opponents.append(op_pos)
 
+        self.toxic_traps = set()
+        num_traps = 2
+        while len(self.toxic_traps) < num_traps:
+            tx = random.randint(0, self.width - 1)
+            ty = random.randint(0, self.height - 1)
+            pos_tuple = (tx, ty)
+            if (pos_tuple != (0, 0) and 
+                pos_tuple not in self.walls and 
+                pos_tuple not in self.food_positions and 
+                pos_tuple not in [tuple(op) for op in self.opponents]):
+                self.toxic_traps.add(pos_tuple)
+
         self.score = 0
         self.steps = 0
         self.collision = False
@@ -47,7 +59,8 @@ class VisualGridHuntGame:
             'hit_wall': tuple(self.agent_pos) in self.walls,
             'collision': self.collision,
             'score': self.score,
-            'remaining_food': len(self.food_positions)
+            'remaining_food': len(self.food_positions),
+            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps  # STEP 2.2: NEW SENSOR
         }
 
     def execute_action(self, action: str):
@@ -73,6 +86,10 @@ class VisualGridHuntGame:
             self.food_positions.remove(tuple_pos)
             self.score += 20
 
+        if tuple_pos in self.toxic_traps:
+            self.score -= 15 
+            self.toxic_traps.remove(tuple_pos)  
+
         for op in self.opponents:
             move = random.choice(['Up', 'Down', 'Left', 'Right', 'Stay'])
             if move == 'Up' and op[1] < self.height - 1:
@@ -97,7 +114,7 @@ class GridGameGUI:
 
     def __init__(self, root, width=10, height=10, num_food=12, num_opponents=2, walls=None):
         self.root = root
-        self.root.title("IT3012 - Scalable Multi-Agent Grid Hunt")
+        self.root.title("IT3012 - Scalable Multi-Agent Grid Hunt with Toxic Traps")
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
@@ -145,6 +162,19 @@ class GridGameGUI:
             y1 = (self.env.height - 1 - fy) * self.cell_size + offset
             self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.5, y1 + self.cell_size * 0.5, fill="#f59e0b",
                                     outline="#d97706")
+
+        for tx, ty in self.env.toxic_traps:
+            offset = self.cell_size * 0.2
+            x1 = tx * self.cell_size + offset
+            y1 = (self.env.height - 1 - ty) * self.cell_size + offset
+            self.canvas.create_polygon(
+                x1 + self.cell_size * 0.3, y1, 
+                x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.3,  
+                x1 + self.cell_size * 0.3, y1 + self.cell_size * 0.6, 
+                x1, y1 + self.cell_size * 0.3, 
+                fill="#a855f7", 
+                outline="#7c3aed"  
+            )
 
         for ox, oy in self.env.opponents:
             offset = self.cell_size * 0.2
