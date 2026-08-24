@@ -1,17 +1,17 @@
 # simulator.py
 from visual_grid_game import VisualGridHuntGame
-from agent import GreedyGridAgent
+from agent import SearchAgent
 
 def run_grid_hunt():
     env = VisualGridHuntGame()
-    agent = GreedyGridAgent()
+    agent = SearchAgent()
 
     print("=== UC Berkeley Style Small Grid Hunt Started ===")
     while not env.is_done():
         percept = env.get_percept()
         action = agent.sense_and_act(percept)
         env.execute_action(action)
-        print(f"Pos: {percept['agent_pos']} | Food Left: {percept['remaining_food']} | Score: {percept['score']} | Smells Food: {percept['smells_food']} | Smells Toxin: {percept['smells_toxin']}")
+        print(f"Action: {action} | Wall Ahead: {percept['wall_ahead']} | Food Here: {percept['food_here']} | Score: {percept['score']}")
 
     print(f"\nGame Over! Final Score: {env.score} after {env.steps} steps.")
     print(f"Food Remaining: {len(env.food_positions)}")

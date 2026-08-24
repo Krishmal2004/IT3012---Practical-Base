@@ -50,36 +50,70 @@ class VisualGridHuntGame:
         self.score = 0
         self.steps = 0
         self.collision = False
+        self.facing = 'Up'
 
     def get_percept(self) -> dict:
+        dx, dy = 0, 0
+        if self.facing == 'Up':
+            dy = 1
+        elif self.facing == 'Down':
+            dy = -1
+        elif self.facing == 'Left':
+            dx = -1
+        elif self.facing == 'Right':
+            dx = 1
+
+        front_x = self.agent_pos[0] + dx
+        front_y = self.agent_pos[1] + dy
+
+        wall_ahead = (
+            front_x < 0 or front_x >= self.width or
+            front_y < 0 or front_y >= self.height or
+            (front_x, front_y) in self.walls
+        )
+
         return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
+            'wall_ahead': wall_ahead,
+            'food_here': tuple(self.agent_pos) in self.food_positions,
             'collision': self.collision,
             'score': self.score,
             'remaining_food': len(self.food_positions),
-            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps  # STEP 2.2: NEW SENSOR
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions)
         }
 
     def execute_action(self, action: str):
         self.steps += 1
-        new_pos = list(self.agent_pos)
+        dirs = ['Up', 'Right', 'Down', 'Left']
 
-        if action == 'Up':
-            new_pos[1] = min(self.height - 1, new_pos[1] + 1)
-        elif action == 'Down':
-            new_pos[1] = max(0, new_pos[1] - 1)
-        elif action == 'Left':
-            new_pos[0] = max(0, new_pos[0] - 1)
-        elif action == 'Right':
-            new_pos[0] = min(self.width - 1, new_pos[0] + 1)
+        if action == 'turn_left':
+            idx = dirs.index(self.facing)
+            self.facing = dirs[(idx - 1) % 4]
+        elif action == 'turn_right':
+            idx = dirs.index(self.facing)
+            self.facing = dirs[(idx + 1) % 4]
+        elif action == 'suck':
+            tuple_pos = tuple(self.agent_pos)
+            if tuple_pos in self.food_positions:
+                self.food_positions.remove(tuple_pos)
+                self.score += 20
+        elif action == 'move_forward' or action in ['Up', 'Down', 'Left', 'Right']:
+            new_pos = list(self.agent_pos)
+            move_dir = self.facing if action == 'move_forward' else action
+            if move_dir == 'Up':
+                new_pos[1] = min(self.height - 1, new_pos[1] + 1)
+            elif move_dir == 'Down':
+                new_pos[1] = max(0, new_pos[1] - 1)
+            elif move_dir == 'Left':
+                new_pos[0] = max(0, new_pos[0] - 1)
+            elif move_dir == 'Right':
+                new_pos[0] = min(self.width - 1, new_pos[0] + 1)
 
-        if tuple(new_pos) in self.walls:
-            self.score -= 5
-        else:
-            self.agent_pos = new_pos
+            if tuple(new_pos) in self.walls:
+                self.score -= 5
+            else:
+                self.agent_pos = new_pos
 
         tuple_pos = tuple(self.agent_pos)
         if tuple_pos in self.food_positions:
@@ -106,7 +140,7 @@ class VisualGridHuntGame:
                 self.collision = True
 
     def is_done(self) -> bool:
-        return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
+        return len(self.food_positions) == 0 or self.steps >= 1000 or self.collision
 
 
 class GridGameGUI:
@@ -192,10 +226,13 @@ class GridGameGUI:
 
     def run_loop(self):
         self.btn.config(state="disabled")
+        from agent import SearchAgent
+        agent = SearchAgent()
 
         def step():
             if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
+                percept = self.env.get_percept()
+                action = agent.sense_and_act(percept)
                 self.env.execute_action(action)
 
                 self.draw_grid()
